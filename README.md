@@ -1,8 +1,6 @@
 # 🦙 HuggingFace → Ollama Downloader
 
 > A web UI to download models from **HuggingFace** (GGUF or Safetensors) and import them into **Ollama** — works with a local install *or* a dockerised Ollama, no CLI required.
->
-> 一個把 **HuggingFace** 模型（GGUF / Safetensors）下載並匯入 **Ollama** 的網頁工具，支援本機或 Docker 裡的 Ollama，全程不需指令列。
 
 <p>
   <img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL%203.0-blue.svg">
@@ -13,41 +11,38 @@
 
 ---
 
-## 🤝 AI × Human co-development｜AI 與人類共同開發
+## 🤝 AI × Human co-development
 
 **This project was built collaboratively by a human developer and an AI assistant (Anthropic's Claude, via Claude Code).**
-The human set the goals, made the product decisions, tested against a real Ollama instance, and reviewed every change; the AI proposed the architecture, wrote the code, diagnosed the environment, and iterated on feedback. Neither did it alone — it is a genuine pair effort.
 
-**本專案由人類開發者與 AI 助手（Anthropic 的 Claude，透過 Claude Code）共同開發完成。**
-由人類訂定需求、做產品決策、在真實 Ollama 環境上實測並審查每一次修改；由 AI 提出架構、撰寫程式、診斷環境並依回饋反覆調整。這不是任一方獨力完成，而是一次真正的「人機協作」。
+The human set the goals, made the product decisions, tested against a real Ollama instance, and reviewed every change. The AI proposed the architecture, wrote the code, diagnosed the environment, and iterated on feedback. Neither did it alone — it is a genuine pair effort.
 
-> 🧠 We believe in being transparent about AI involvement. This README, the code, and the design were produced through human–AI collaboration.
-> 我們主張對 AI 參與保持透明：本說明文件、程式碼與設計皆來自人機協作的成果。
+> 🧠 We believe in being transparent about AI involvement. This README, the code, and the design were all produced through human–AI collaboration.
 
 ---
 
-## ✨ Features｜功能
+## ✨ Features
 
-- **🌐 多國語言 / i18n** — 右上角切換 **繁體中文 / English / 日本語 / 한국어 / 简体中文**，**會記住上次選擇**（存於瀏覽器 `localStorage`，首次依瀏覽器語言自動判斷）。
-- **🖥️ Web UI** — 純瀏覽器操作，無需指令列。
-- **📂 Ollama 資料目錄** — UI 上可填（預設 `/mnt/ollama`），本地模式會以此設定 `OLLAMA_MODELS`。
-- **⚙️ 三種執行模式：**
-  - **HTTP API（推薦，預設）** — 直接連 Ollama 服務（預設 `http://127.0.0.1:11434`）。本機或 Docker 內皆可用，**免 sudo、免掛載 volume**。
-  - **本地 binary** — 呼叫本機安裝的 `ollama` 指令。
-  - **Docker（`docker exec`）** — 對容器執行 `docker exec`，socket 需權限時可設 `sudo docker`。
-- **📊 狀態檢視** — 顯示 `ollama ps`（執行中）與 `ollama list`（已安裝），可重新整理。
-- **⬇️ 匯入流程** — 列出 HF repo 內檔案、勾選下載、即時進度，完成後自動建立 Ollama 模型；GGUF 與 Safetensors 皆支援。
+- **🌐 Internationalization** — Switch between **Traditional Chinese / English / Japanese / Korean / Simplified Chinese** from the top-right corner. **Your choice is remembered** (stored in the browser's `localStorage`; on first visit it auto-detects from your browser language).
+- **🖥️ Web UI** — Everything in the browser, no command line needed.
+- **📂 Ollama data directory** — Configurable in the UI (defaults to `/mnt/ollama`); binary mode exports it as `OLLAMA_MODELS`.
+- **⚙️ Three run modes:**
+  - **HTTP API (recommended, default)** — Talks to the Ollama service directly (default `http://127.0.0.1:11434`). Works for local *or* dockerised Ollama, with **no sudo and no volume mounts**.
+  - **Local binary** — Invokes the locally installed `ollama` command.
+  - **Docker (`docker exec`)** — Runs `docker exec` against the container; set the command to `sudo docker` when the socket needs privileges.
+- **📊 Status view** — Shows `ollama ps` (running) and `ollama list` (installed), refreshable.
+- **⬇️ Import flow** — Lists files in a HF repo, lets you pick which to download, streams live progress, then creates the Ollama model automatically. Both GGUF and Safetensors are supported.
 
 ---
 
-## 🚀 Quick start｜安裝與啟動
+## 🚀 Quick start
 
 ```bash
 ./run.sh
-# 預設啟動於 http://127.0.0.1:8765
+# Serves on http://127.0.0.1:8765 by default
 ```
 
-第一次執行會自動建立 `.venv` 並安裝相依套件。也可手動：
+The first run automatically creates `.venv` and installs dependencies. To do it manually:
 
 ```bash
 python3 -m venv .venv
@@ -55,77 +50,75 @@ python3 -m venv .venv
 .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8765
 ```
 
-可用環境變數覆寫 `HOST` / `PORT`，例如要在區網內存取：
+Override `HOST` / `PORT` via environment variables, e.g. to expose it on your LAN:
 
 ```bash
 HOST=0.0.0.0 PORT=8765 ./run.sh
 ```
 
-> Requirements: Python 3.10+, and a running Ollama (local binary, systemd, or Docker with port `11434` published).
+> **Requirements:** Python 3.10+, and a running Ollama (local binary, systemd, or Docker with port `11434` published).
 
 ---
 
-## 📖 Usage｜使用步驟
+## 📖 Usage
 
-1. **Ollama 設定**
-   - 填資料目錄（如 `/mnt/ollama`，僅作參考；實際存放位置由 Ollama 服務本身設定決定）。
-   - 選執行模式：
-     - **HTTP API（推薦）**：填 API 位址（預設 `http://127.0.0.1:11434`）。最簡單，本機 / Docker 皆通。
-     - **本地 binary**：填 ollama 路徑（如 `ollama` 或 `/usr/local/bin/ollama`）。
-     - **Docker**：填容器名稱與 docker 指令（權限不足時用 `sudo docker`）。
-   - （選填）填 HuggingFace Token 以下載私有 / 受限模型。
-   - 按 **測試連線**（會自動先儲存目前表單）確認 Ollama 可用。
-2. **Ollama 狀態** 區按重新整理，即可看到 `ollama ps` / `ollama list`。
-3. **從 HuggingFace 匯入**
-   - 填 repo id（如 `Qwen/Qwen2.5-0.5B-Instruct-GGUF`），按 **列出檔案**。
-   - 勾選要下載的檔案（GGUF 可只選一個量化檔；Safetensors 需選權重 + 設定檔）。
-   - 選格式、填模型名稱（如 `my-qwen:0.5b`），可加額外 Modelfile 指令。
-   - 按 **開始下載並匯入**，於 **工作進度** 看即時 log 與進度條。
-
----
-
-## 🔧 How it works｜運作方式
-
-### HTTP API 模式（推薦）
-
-1. 把 HF 檔案下載到主機暫存目錄。
-2. 對每個模型檔計算 sha256，用 `POST /api/blobs/sha256:<digest>` 上傳到 Ollama（已存在則跳過）。
-3. 呼叫 `POST /api/create`，把 `files` 對應到剛上傳的 blob，串流回傳建立進度。
-4. 額外的 Modelfile 指令（`SYSTEM` / `TEMPLATE` / `PARAMETER`）會被解析成結構化欄位一併送出。
-
-因為檔案透過 HTTP 上傳，**即使 Ollama 跑在 Docker 容器內也不需掛載 volume 或 `docker cp`**，也不需要 sudo。狀態查詢改用 `GET /api/ps` 與 `GET /api/tags`。
-
-### Docker（docker exec）模式
-
-1. 把 HF 檔案下載到主機暫存目錄。
-2. 用 `docker cp` 把暫存目錄（含產生的 `Modelfile`）複製進容器的 `/tmp/h2o/`。
-3. 在容器內執行 `ollama create <name> -f /tmp/h2o/.../Modelfile`。
-4. 完成後清掉容器內暫存。
+1. **Ollama settings**
+   - Set the data directory (e.g. `/mnt/ollama`; this is informational — the actual storage location is decided by the Ollama service itself).
+   - Pick a run mode:
+     - **HTTP API (recommended):** enter the API URL (default `http://127.0.0.1:11434`). Simplest option; works for both local and Docker.
+     - **Local binary:** enter the ollama path (e.g. `ollama` or `/usr/local/bin/ollama`).
+     - **Docker:** enter the container name and docker command (use `sudo docker` if the socket needs privileges).
+   - (Optional) Enter a HuggingFace token to download private/gated models.
+   - Click **Test connection** (it auto-saves the current form first) to confirm Ollama is reachable.
+2. In the **Ollama status** section, click refresh to see `ollama ps` / `ollama list`.
+3. **Import from HuggingFace**
+   - Enter a repo id (e.g. `Qwen/Qwen2.5-0.5B-Instruct-GGUF`) and click **List files**.
+   - Tick the files to download (for GGUF, one quantization file is enough; for Safetensors, select the weights + config files).
+   - Choose the format, set a model name (e.g. `my-qwen:0.5b`), and optionally add extra Modelfile directives.
+   - Click **Download & import** and watch the live log and progress bar under **Job progress**.
 
 ---
 
-## 🗂️ Architecture｜架構
+## 🔧 How it works
+
+### HTTP API mode (recommended)
+
+1. Download the HF files into a staging directory on the host.
+2. Compute the sha256 of each model file and upload it via `POST /api/blobs/sha256:<digest>` (skipped if Ollama already has it).
+3. Call `POST /api/create`, mapping `files` to the uploaded blobs, and stream back creation progress.
+4. Extra Modelfile directives (`SYSTEM` / `TEMPLATE` / `PARAMETER`) are parsed into the structured fields and sent along.
+
+Because files are uploaded over HTTP, **importing works even when Ollama runs inside a Docker container — no volume mount or `docker cp` needed**, and no sudo. Status is read via `GET /api/ps` and `GET /api/tags`.
+
+### Docker (`docker exec`) mode
+
+1. Download the HF files into a staging directory on the host.
+2. Use `docker cp` to copy the staging directory (including the generated `Modelfile`) into the container's `/tmp/h2o/`.
+3. Run `ollama create <name> -f /tmp/h2o/.../Modelfile` inside the container.
+4. Clean up the in-container staging afterward.
+
+---
+
+## 🗂️ Architecture
 
 ```
 app/
-  main.py            FastAPI 路由 + 靜態頁面
-  settings.py        設定持久化 (settings.json)
-  ollama_api.py      Ollama HTTP API：version / ps / tags / blob 上傳 / create
-  runner.py          Ollama 執行抽象（api / binary / docker exec）+ 表格解析
-  downloader.py      HuggingFace 檔案列舉與串流下載（含進度、續傳）
-  jobs.py            背景匯入工作（下載 → 建立模型）
-  static/index.html  單頁 Web UI（含 i18n）
+  main.py            FastAPI routes + static page
+  settings.py        Settings persistence (settings.json)
+  ollama_api.py      Ollama HTTP API: version / ps / tags / blob upload / create
+  runner.py          Ollama execution abstraction (api / binary / docker exec) + table parsing
+  downloader.py      HuggingFace file listing + streaming download (progress, resume)
+  jobs.py            Background import jobs (download → create model)
+  static/index.html  Single-page web UI (with i18n)
 ```
 
-執行階段產生的設定 `settings.json`、下載暫存 `downloads/`，皆已列入 `.gitignore`（前者可能含 HF Token，後者可能很大）。
+The runtime-generated `settings.json` and the `downloads/` staging directory are both listed in `.gitignore` (the former may contain your HF token, the latter can be large).
 
 ---
 
-## 📜 License｜授權
+## 📜 License
 
 Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).
-
-本專案以 **GNU GPL-3.0** 授權釋出，詳見 [LICENSE](LICENSE)。
 
 ```
 HuggingFace → Ollama Downloader
@@ -140,7 +133,7 @@ more details.
 
 ---
 
-## 🙏 Acknowledgements｜致謝
+## 🙏 Acknowledgements
 
 - [Ollama](https://ollama.com) · [HuggingFace Hub](https://huggingface.co) · [FastAPI](https://fastapi.tiangolo.com)
 - Built with [Claude Code](https://claude.com/claude-code) through human–AI collaboration.
