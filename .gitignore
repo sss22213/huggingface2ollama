@@ -1,0 +1,28 @@
+# --- Python ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- App data (never commit: may contain HF tokens / large model files) ---
+settings.json
+downloads/
+
+# --- Runtime / logs ---
+nohup.out
+*.log
+*.pid
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~

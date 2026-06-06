@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HuggingFace → Ollama</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#222b36; --border:#2d3744;
+    --text:#e6edf3; --muted:#8b98a5; --accent:#3b82f6; --accent2:#2563eb;
+    --ok:#22c55e; --err:#ef4444; --warn:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC","Noto Sans JP","Noto Sans KR",sans-serif;
+       background:var(--bg);color:var(--text);font-size:14px}
+  header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+  header h1{font-size:18px;margin:0;font-weight:600}
+  header .badge{font-size:12px;color:var(--muted)}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:20px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px}
+  .card h2{margin:0 0 14px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+  input[type=text],input[type=password],select,textarea{
+    width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;
+    color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit}
+  textarea{resize:vertical;min-height:60px;font-family:ui-monospace,monospace}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 14px;
+         font-size:13px;cursor:pointer;font-weight:500}
+  button:hover{background:var(--accent2)}
+  button.secondary{background:var(--panel2);border:1px solid var(--border)}
+  button.secondary:hover{background:#2d3744}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .mode-rows>div{display:none}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px}
+  .pill.ok{background:rgba(34,197,94,.15);color:var(--ok)}
+  .pill.err{background:rgba(239,68,68,.15);color:var(--err)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  tbody tr:hover{background:var(--panel2)}
+  .filelist{max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:6px}
+  .filerow{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border)}
+  .filerow:last-child{border-bottom:none}
+  .filerow code{font-family:ui-monospace,monospace;font-size:12px}
+  .filerow .sz{margin-left:auto;color:var(--muted);font-size:12px}
+  .tag{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(59,130,246,.2);color:#93c5fd}
+  .progress{height:8px;background:var(--panel2);border-radius:999px;overflow:hidden;margin:8px 0}
+  .progress>div{height:100%;background:var(--accent);width:0;transition:width .2s}
+  pre.log{background:#0b0e13;border:1px solid var(--border);border-radius:6px;padding:10px;
+          font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap;margin:0;
+          font-family:ui-monospace,monospace}
+  .muted{color:var(--muted)}
+  .statusline{font-size:12px;margin-top:6px}
+  .empty{color:var(--muted);padding:10px;text-align:center}
+  #lang{margin-left:auto;width:auto;font-size:13px;padding:5px 8px}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border);
+        border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="app.title">🦙 HuggingFace → Ollama</h1>
+  <span class="badge" id="connBadge"></span>
+  <select id="lang" onchange="setLang(this.value)" title="Language">
+    <option value="zh-Hant">繁體中文</option>
+    <option value="en">English</option>
+    <option value="ja">日本語</option>
+    <option value="ko">한국어</option>
+    <option value="zh-Hans">简体中文</option>
+  </select>
+</header>
+<div class="wrap">
+
+  <!-- ============ Settings ============ -->
+  <div class="card">
+    <h2 data-i18n="settings.heading">Ollama 設定</h2>
+    <div class="grid">
+      <div>
+        <label data-i18n="settings.dataDir.label">Ollama 資料目錄</label>
+        <input type="text" id="ollama_data_dir" placeholder="/mnt/ollama">
+        <div class="hint" data-i18n="settings.dataDir.hint"></div>
+      </div>
+      <div>
+        <label data-i18n="settings.runMode.label">執行模式</label>
+        <select id="run_mode" onchange="updateModeUI()">
+          <option value="api" data-i18n="settings.runMode.api">HTTP API</option>
+          <option value="binary" data-i18n="settings.runMode.binary">binary</option>
+          <option value="docker" data-i18n="settings.runMode.docker">Docker</option>
+        </select>
+        <div class="hint" data-i18n="settings.runMode.hint"></div>
+      </div>
+    </div>
+    <div class="mode-rows" style="margin-top:12px">
+      <div data-mode="api">
+        <label data-i18n="settings.apiHost.label">Ollama API</label>
+        <input type="text" id="ollama_host" placeholder="http://127.0.0.1:11434">
+        <div class="hint" data-i18n="settings.apiHost.hint"></div>
+      </div>
+      <div data-mode="binary">
+        <label data-i18n="settings.binaryPath.label">binary</label>
+        <input type="text" id="binary_path" data-i18n-ph="settings.binaryPath.ph">
+      </div>
+      <div data-mode="docker">
+        <div class="grid">
+          <div>
+            <label data-i18n="settings.dockerContainer.label">Docker container</label>
+            <input type="text" id="docker_container" placeholder="ollama">
+          </div>
+          <div>
+            <label data-i18n="settings.dockerCommand.label">Docker command</label>
+            <input type="text" id="docker_command" data-i18n-ph="settings.dockerCommand.ph">
+            <div class="hint" data-i18n="settings.dockerCommand.hint"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <div>
+        <label data-i18n="settings.hfToken.label">HuggingFace Token</label>
+        <input type="password" id="hf_token" data-i18n-ph="settings.hfToken.ph">
+      </div>
+      <div>
+        <label data-i18n="settings.downloadDir.label">Download dir</label>
+        <input type="text" id="download_dir">
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button onclick="saveSettings()" data-i18n="settings.save">Save</button>
+      <button class="secondary" onclick="testConnection()" data-i18n="settings.test">Test</button>
+      <span id="connStatus" class="statusline"></span>
+    </div>
+  </div>
+
+  <!-- ============ Ollama status ============ -->
+  <div class="card">
+    <h2>
+      <span data-i18n="status.heading">Ollama 狀態</span>
+      <button class="secondary" style="margin-left:auto;font-size:12px;padding:4px 10px" onclick="refreshStatus()" data-i18n="status.refresh">Refresh</button>
+    </h2>
+    <h3 style="font-size:13px;margin:4px 0 8px;color:var(--muted)" data-i18n="status.running">執行中 (ollama ps)</h3>
+    <div id="psTable"><div class="empty">—</div></div>
+    <h3 style="font-size:13px;margin:18px 0 8px;color:var(--muted)" data-i18n="status.installed">已安裝 (ollama list)</h3>
+    <div id="listTable"><div class="empty">—</div></div>
+  </div>
+
+  <!-- ============ Import ============ -->
+  <div class="card">
+    <h2 data-i18n="import.heading">從 HuggingFace 匯入</h2>
+    <div class="grid">
+      <div>
+        <label data-i18n="import.repoId.label">HuggingFace Repo ID</label>
+        <input type="text" id="repo_id" data-i18n-ph="import.repoId.ph">
+      </div>
+      <div>
+        <label data-i18n="import.revision.label">Revision</label>
+        <input type="text" id="revision" value="main">
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="secondary" onclick="listFiles()" data-i18n="import.listFiles">List files</button>
+      <span id="filesStatus" class="statusline"></span>
+    </div>
+
+    <div id="filesWrap" style="display:none;margin-top:12px">
+      <div class="row" style="margin-bottom:8px">
+        <label style="margin:0" data-i18n="import.selectLabel">Select files</label>
+        <button class="secondary" style="font-size:11px;padding:3px 8px" onclick="selectByType('gguf')" data-i18n="import.selectGguf">All GGUF</button>
+        <button class="secondary" style="font-size:11px;padding:3px 8px" onclick="selectByType('safetensors')" data-i18n="import.selectSafetensors">All Safetensors</button>
+        <button class="secondary" style="font-size:11px;padding:3px 8px" onclick="selectByType('none')" data-i18n="import.selectNone">Clear</button>
+      </div>
+      <div class="filelist" id="fileList"></div>
+
+      <div class="grid" style="margin-top:14px">
+        <div>
+          <label data-i18n="import.fmt.label">Format</label>
+          <select id="fmt">
+            <option value="gguf" data-i18n="import.fmt.gguf">GGUF</option>
+            <option value="safetensors" data-i18n="import.fmt.safetensors">Safetensors</option>
+          </select>
+        </div>
+        <div>
+          <label data-i18n="import.modelName.label">Ollama model name</label>
+          <input type="text" id="model_name" data-i18n-ph="import.modelName.ph">
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label data-i18n="import.extra.label">Extra Modelfile</label>
+        <textarea id="extra_modelfile" placeholder='PARAMETER temperature 0.7&#10;SYSTEM "You are helpful."'></textarea>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button onclick="startImport()" data-i18n="import.start">Download & import</button>
+        <span id="importStatus" class="statusline"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Jobs ============ -->
+  <div class="card" id="jobsCard" style="display:none">
+    <h2 data-i18n="jobs.heading">工作進度</h2>
+    <div id="jobsWrap"></div>
+  </div>
+
+</div>
+
+<script>
+// ==================== i18n ====================
+const I18N = {
+  "zh-Hant": {
+    "doc.title":"HuggingFace → Ollama 下載器",
+    "app.title":"🦙 HuggingFace → Ollama 下載器",
+    "badge.disconnected":"未連線",
+    "badge.connectedWith":"已連線 · {0}",
+    "settings.heading":"⚙️ Ollama 設定",
+    "settings.dataDir.label":"Ollama 資料目錄 (OLLAMA_MODELS)",
+    "settings.dataDir.hint":"模型存放位置。本地模式會以此設定 OLLAMA_MODELS。",
+    "settings.runMode.label":"執行模式",
+    "settings.runMode.api":"HTTP API（推薦）",
+    "settings.runMode.binary":"本地 binary",
+    "settings.runMode.docker":"Docker (docker exec)",
+    "settings.runMode.hint":"HTTP API 最通用：本機或 docker 內的 ollama 都能連，免 sudo、免掛載。",
+    "settings.apiHost.label":"Ollama API 位址",
+    "settings.apiHost.hint":"ollama 服務的 HTTP 位址。docker 發佈到主機的 11434 即可直接用。匯入時模型檔以 blob 上傳，免掛載 volume。",
+    "settings.binaryPath.label":"Ollama 安裝路徑 (binary)",
+    "settings.binaryPath.ph":"ollama 或 /usr/local/bin/ollama",
+    "settings.dockerContainer.label":"Docker 容器名稱",
+    "settings.dockerCommand.label":"Docker 指令",
+    "settings.dockerCommand.ph":"docker 或 sudo docker",
+    "settings.dockerCommand.hint":'socket 需要權限時填 "sudo docker"。',
+    "settings.hfToken.label":"HuggingFace Token（私有/受限模型，選填）",
+    "settings.hfToken.ph":"hf_xxx（已設定則留空維持原值）",
+    "settings.hfToken.phSet":"已設定（留空維持原值）",
+    "settings.downloadDir.label":"下載暫存目錄",
+    "settings.save":"💾 儲存設定",
+    "settings.test":"🔌 測試連線",
+    "status.heading":"📊 Ollama 狀態",
+    "status.refresh":"🔄 重新整理",
+    "status.running":"執行中 (ollama ps)",
+    "status.installed":"已安裝 (ollama list)",
+    "import.heading":"⬇️ 從 HuggingFace 匯入",
+    "import.repoId.label":"HuggingFace Repo ID",
+    "import.repoId.ph":"如 bartowski/Llama-3.2-3B-Instruct-GGUF",
+    "import.revision.label":"Revision / 分支",
+    "import.listFiles":"📁 列出檔案",
+    "import.selectLabel":"選擇要下載的檔案",
+    "import.selectGguf":"全選 GGUF",
+    "import.selectSafetensors":"全選 Safetensors+設定檔",
+    "import.selectNone":"清除",
+    "import.fmt.label":"格式",
+    "import.fmt.gguf":"GGUF（單檔/分割檔）",
+    "import.fmt.safetensors":"Safetensors（完整 repo 轉換）",
+    "import.modelName.label":"Ollama 模型名稱",
+    "import.modelName.ph":"如 my-llama3.2:3b",
+    "import.extra.label":"額外 Modelfile 指令（選填，如 TEMPLATE / PARAMETER / SYSTEM）",
+    "import.start":"🚀 開始下載並匯入",
+    "jobs.heading":"🛠️ 工作進度",
+    "msg.saved":"已儲存",
+    "msg.testing":"測試中...",
+    "msg.ollamaOk":"ollama OK",
+    "msg.ollamaFail":"ollama 無法連線",
+    "msg.dataDirOk":"資料目錄可寫",
+    "msg.dataDirErr":"資料目錄：{0}",
+    "msg.fillRepoId":"請填 repo id",
+    "msg.readingFiles":"讀取檔案清單...",
+    "msg.filesCount":"{0} 個檔案",
+    "msg.selectOne":"請至少選一個檔案",
+    "msg.fillModelName":"請填模型名稱",
+    "msg.jobStarted":"工作已啟動",
+    "status.fetchFail":"無法取得：{0}",
+    "status.none":"（無）",
+    "job.running":"執行中",
+    "job.done":"完成",
+    "job.error":"錯誤",
+    "job.queued":"排隊中"
+  },
+  "en": {
+    "doc.title":"HuggingFace → Ollama Downloader",
+    "app.title":"🦙 HuggingFace → Ollama Downloader",
+    "badge.disconnected":"Disconnected",
+    "badge.connectedWith":"Connected · {0}",
+    "settings.heading":"⚙️ Ollama Settings",
+    "settings.dataDir.label":"Ollama data directory (OLLAMA_MODELS)",
+    "settings.dataDir.hint":"Where models are stored. Binary mode sets OLLAMA_MODELS to this.",
+    "settings.runMode.label":"Run mode",
+    "settings.runMode.api":"HTTP API (recommended)",
+    "settings.runMode.binary":"Local binary",
+    "settings.runMode.docker":"Docker (docker exec)",
+    "settings.runMode.hint":"HTTP API is the most universal: works for local or dockerised ollama, no sudo or mounts.",
+    "settings.apiHost.label":"Ollama API URL",
+    "settings.apiHost.hint":"HTTP URL of the ollama service. If docker publishes 11434 to the host it just works. Files upload as blobs on import — no volume mount needed.",
+    "settings.binaryPath.label":"Ollama install path (binary)",
+    "settings.binaryPath.ph":"ollama or /usr/local/bin/ollama",
+    "settings.dockerContainer.label":"Docker container name",
+    "settings.dockerCommand.label":"Docker command",
+    "settings.dockerCommand.ph":"docker or sudo docker",
+    "settings.dockerCommand.hint":'Use "sudo docker" when the socket needs privileges.',
+    "settings.hfToken.label":"HuggingFace token (private/gated models, optional)",
+    "settings.hfToken.ph":"hf_xxx (leave blank to keep current)",
+    "settings.hfToken.phSet":"Already set (leave blank to keep)",
+    "settings.downloadDir.label":"Download staging directory",
+    "settings.save":"💾 Save settings",
+    "settings.test":"🔌 Test connection",
+    "status.heading":"📊 Ollama status",
+    "status.refresh":"🔄 Refresh",
+    "status.running":"Running (ollama ps)",
+    "status.installed":"Installed (ollama list)",
+    "import.heading":"⬇️ Import from HuggingFace",
+    "import.repoId.label":"HuggingFace Repo ID",
+    "import.repoId.ph":"e.g. bartowski/Llama-3.2-3B-Instruct-GGUF",
+    "import.revision.label":"Revision / branch",
+    "import.listFiles":"📁 List files",
+    "import.selectLabel":"Select files to download",
+    "import.selectGguf":"Select all GGUF",
+    "import.selectSafetensors":"Select all Safetensors + configs",
+    "import.selectNone":"Clear",
+    "import.fmt.label":"Format",
+    "import.fmt.gguf":"GGUF (single / split files)",
+    "import.fmt.safetensors":"Safetensors (full repo conversion)",
+    "import.modelName.label":"Ollama model name",
+    "import.modelName.ph":"e.g. my-llama3.2:3b",
+    "import.extra.label":"Extra Modelfile directives (optional, e.g. TEMPLATE / PARAMETER / SYSTEM)",
+    "import.start":"🚀 Download & import",
+    "jobs.heading":"🛠️ Job progress",
+    "msg.saved":"Saved",
+    "msg.testing":"Testing...",
+    "msg.ollamaOk":"ollama OK",
+    "msg.ollamaFail":"ollama unreachable",
+    "msg.dataDirOk":"Data dir writable",
+    "msg.dataDirErr":"Data dir: {0}",
+    "msg.fillRepoId":"Enter a repo id",
+    "msg.readingFiles":"Reading file list...",
+    "msg.filesCount":"{0} files",
+    "msg.selectOne":"Select at least one file",
+    "msg.fillModelName":"Enter a model name",
+    "msg.jobStarted":"Job started",
+    "status.fetchFail":"Failed to fetch: {0}",
+    "status.none":"(none)",
+    "job.running":"Running",
+    "job.done":"Done",
+    "job.error":"Error",
+    "job.queued":"Queued"
+  },
+  "ja": {
+    "doc.title":"HuggingFace → Ollama ダウンローダー",
+    "app.title":"🦙 HuggingFace → Ollama ダウンローダー",
+    "badge.disconnected":"未接続",
+    "badge.connectedWith":"接続済み · {0}",
+    "settings.heading":"⚙️ Ollama 設定",
+    "settings.dataDir.label":"Ollama データディレクトリ (OLLAMA_MODELS)",
+    "settings.dataDir.hint":"モデルの保存場所。binary モードではこれを OLLAMA_MODELS に設定します。",
+    "settings.runMode.label":"実行モード",
+    "settings.runMode.api":"HTTP API（推奨）",
+    "settings.runMode.binary":"ローカル binary",
+    "settings.runMode.docker":"Docker (docker exec)",
+    "settings.runMode.hint":"HTTP API が最も汎用的：ローカルでも docker 内の ollama でも接続でき、sudo もマウントも不要。",
+    "settings.apiHost.label":"Ollama API アドレス",
+    "settings.apiHost.hint":"ollama サービスの HTTP アドレス。docker がホストに 11434 を公開していればそのまま使えます。インポート時はモデルファイルを blob としてアップロードするため、volume のマウントは不要です。",
+    "settings.binaryPath.label":"Ollama インストールパス (binary)",
+    "settings.binaryPath.ph":"ollama または /usr/local/bin/ollama",
+    "settings.dockerContainer.label":"Docker コンテナ名",
+    "settings.dockerCommand.label":"Docker コマンド",
+    "settings.dockerCommand.ph":"docker または sudo docker",
+    "settings.dockerCommand.hint":'socket に権限が必要な場合は "sudo docker" を指定します。',
+    "settings.hfToken.label":"HuggingFace トークン（プライベート/制限付きモデル用、任意）",
+    "settings.hfToken.ph":"hf_xxx（設定済みなら空欄で現状維持）",
+    "settings.hfToken.phSet":"設定済み（空欄で現状維持）",
+    "settings.downloadDir.label":"ダウンロード一時ディレクトリ",
+    "settings.save":"💾 設定を保存",
+    "settings.test":"🔌 接続テスト",
+    "status.heading":"📊 Ollama ステータス",
+    "status.refresh":"🔄 更新",
+    "status.running":"実行中 (ollama ps)",
+    "status.installed":"インストール済み (ollama list)",
+    "import.heading":"⬇️ HuggingFace からインポート",
+    "import.repoId.label":"HuggingFace Repo ID",
+    "import.repoId.ph":"例: bartowski/Llama-3.2-3B-Instruct-GGUF",
+    "import.revision.label":"Revision / ブランチ",
+    "import.listFiles":"📁 ファイル一覧",
+    "import.selectLabel":"ダウンロードするファイルを選択",
+    "import.selectGguf":"GGUF を全選択",
+    "import.selectSafetensors":"Safetensors+設定ファイルを全選択",
+    "import.selectNone":"クリア",
+    "import.fmt.label":"形式",
+    "import.fmt.gguf":"GGUF（単一/分割ファイル）",
+    "import.fmt.safetensors":"Safetensors（リポジトリ全体を変換）",
+    "import.modelName.label":"Ollama モデル名",
+    "import.modelName.ph":"例: my-llama3.2:3b",
+    "import.extra.label":"追加の Modelfile ディレクティブ（任意、例: TEMPLATE / PARAMETER / SYSTEM）",
+    "import.start":"🚀 ダウンロードしてインポート",
+    "jobs.heading":"🛠️ ジョブの進捗",
+    "msg.saved":"保存しました",
+    "msg.testing":"テスト中...",
+    "msg.ollamaOk":"ollama OK",
+    "msg.ollamaFail":"ollama に接続できません",
+    "msg.dataDirOk":"データディレクトリ書き込み可",
+    "msg.dataDirErr":"データディレクトリ：{0}",
+    "msg.fillRepoId":"repo id を入力してください",
+    "msg.readingFiles":"ファイル一覧を読み込み中...",
+    "msg.filesCount":"{0} 個のファイル",
+    "msg.selectOne":"少なくとも1つのファイルを選択してください",
+    "msg.fillModelName":"モデル名を入力してください",
+    "msg.jobStarted":"ジョブを開始しました",
+    "status.fetchFail":"取得できません：{0}",
+    "status.none":"（なし）",
+    "job.running":"実行中",
+    "job.done":"完了",
+    "job.error":"エラー",
+    "job.queued":"待機中"
+  },
+  "ko": {
+    "doc.title":"HuggingFace → Ollama 다운로더",
+    "app.title":"🦙 HuggingFace → Ollama 다운로더",
+    "badge.disconnected":"연결 안 됨",
+    "badge.connectedWith":"연결됨 · {0}",
+    "settings.heading":"⚙️ Ollama 설정",
+    "settings.dataDir.label":"Ollama 데이터 디렉터리 (OLLAMA_MODELS)",
+    "settings.dataDir.hint":"모델 저장 위치. binary 모드에서는 이 값을 OLLAMA_MODELS로 설정합니다.",
+    "settings.runMode.label":"실행 모드",
+    "settings.runMode.api":"HTTP API (권장)",
+    "settings.runMode.binary":"로컬 binary",
+    "settings.runMode.docker":"Docker (docker exec)",
+    "settings.runMode.hint":"HTTP API가 가장 범용적입니다: 로컬이든 docker 내부든 ollama에 연결되며 sudo·마운트가 필요 없습니다.",
+    "settings.apiHost.label":"Ollama API 주소",
+    "settings.apiHost.hint":"ollama 서비스의 HTTP 주소. docker가 11434를 호스트에 게시하면 바로 사용할 수 있습니다. 가져올 때 모델 파일을 blob으로 업로드하므로 volume 마운트가 필요 없습니다.",
+    "settings.binaryPath.label":"Ollama 설치 경로 (binary)",
+    "settings.binaryPath.ph":"ollama 또는 /usr/local/bin/ollama",
+    "settings.dockerContainer.label":"Docker 컨테이너 이름",
+    "settings.dockerCommand.label":"Docker 명령",
+    "settings.dockerCommand.ph":"docker 또는 sudo docker",
+    "settings.dockerCommand.hint":'socket에 권한이 필요하면 "sudo docker"를 입력하세요.',
+    "settings.hfToken.label":"HuggingFace 토큰 (비공개/제한 모델용, 선택)",
+    "settings.hfToken.ph":"hf_xxx (설정되어 있으면 비워두면 유지)",
+    "settings.hfToken.phSet":"설정됨 (비워두면 유지)",
+    "settings.downloadDir.label":"다운로드 임시 디렉터리",
+    "settings.save":"💾 설정 저장",
+    "settings.test":"🔌 연결 테스트",
+    "status.heading":"📊 Ollama 상태",
+    "status.refresh":"🔄 새로고침",
+    "status.running":"실행 중 (ollama ps)",
+    "status.installed":"설치됨 (ollama list)",
+    "import.heading":"⬇️ HuggingFace에서 가져오기",
+    "import.repoId.label":"HuggingFace Repo ID",
+    "import.repoId.ph":"예: bartowski/Llama-3.2-3B-Instruct-GGUF",
+    "import.revision.label":"Revision / 브랜치",
+    "import.listFiles":"📁 파일 목록",
+    "import.selectLabel":"다운로드할 파일 선택",
+    "import.selectGguf":"GGUF 전체 선택",
+    "import.selectSafetensors":"Safetensors+설정 파일 전체 선택",
+    "import.selectNone":"지우기",
+    "import.fmt.label":"형식",
+    "import.fmt.gguf":"GGUF (단일/분할 파일)",
+    "import.fmt.safetensors":"Safetensors (전체 repo 변환)",
+    "import.modelName.label":"Ollama 모델 이름",
+    "import.modelName.ph":"예: my-llama3.2:3b",
+    "import.extra.label":"추가 Modelfile 지시문 (선택, 예: TEMPLATE / PARAMETER / SYSTEM)",
+    "import.start":"🚀 다운로드 및 가져오기",
+    "jobs.heading":"🛠️ 작업 진행 상황",
+    "msg.saved":"저장됨",
+    "msg.testing":"테스트 중...",
+    "msg.ollamaOk":"ollama OK",
+    "msg.ollamaFail":"ollama에 연결할 수 없음",
+    "msg.dataDirOk":"데이터 디렉터리 쓰기 가능",
+    "msg.dataDirErr":"데이터 디렉터리: {0}",
+    "msg.fillRepoId":"repo id를 입력하세요",
+    "msg.readingFiles":"파일 목록을 읽는 중...",
+    "msg.filesCount":"파일 {0}개",
+    "msg.selectOne":"파일을 하나 이상 선택하세요",
+    "msg.fillModelName":"모델 이름을 입력하세요",
+    "msg.jobStarted":"작업이 시작됨",
+    "status.fetchFail":"가져올 수 없음: {0}",
+    "status.none":"(없음)",
+    "job.running":"실행 중",
+    "job.done":"완료",
+    "job.error":"오류",
+    "job.queued":"대기 중"
+  },
+  "zh-Hans": {
+    "doc.title":"HuggingFace → Ollama 下载器",
+    "app.title":"🦙 HuggingFace → Ollama 下载器",
+    "badge.disconnected":"未连接",
+    "badge.connectedWith":"已连接 · {0}",
+    "settings.heading":"⚙️ Ollama 设置",
+    "settings.dataDir.label":"Ollama 数据目录 (OLLAMA_MODELS)",
+    "settings.dataDir.hint":"模型存放位置。本地模式会以此设置 OLLAMA_MODELS。",
+    "settings.runMode.label":"执行模式",
+    "settings.runMode.api":"HTTP API（推荐）",
+    "settings.runMode.binary":"本地 binary",
+    "settings.runMode.docker":"Docker (docker exec)",
+    "settings.runMode.hint":"HTTP API 最通用：本机或 docker 内的 ollama 都能连，免 sudo、免挂载。",
+    "settings.apiHost.label":"Ollama API 地址",
+    "settings.apiHost.hint":"ollama 服务的 HTTP 地址。docker 发布到主机的 11434 即可直接用。导入时模型文件以 blob 上传，免挂载 volume。",
+    "settings.binaryPath.label":"Ollama 安装路径 (binary)",
+    "settings.binaryPath.ph":"ollama 或 /usr/local/bin/ollama",
+    "settings.dockerContainer.label":"Docker 容器名称",
+    "settings.dockerCommand.label":"Docker 命令",
+    "settings.dockerCommand.ph":"docker 或 sudo docker",
+    "settings.dockerCommand.hint":'socket 需要权限时填 "sudo docker"。',
+    "settings.hfToken.label":"HuggingFace Token（私有/受限模型，选填）",
+    "settings.hfToken.ph":"hf_xxx（已设置则留空保持原值）",
+    "settings.hfToken.phSet":"已设置（留空保持原值）",
+    "settings.downloadDir.label":"下载暂存目录",
+    "settings.save":"💾 保存设置",
+    "settings.test":"🔌 测试连接",
+    "status.heading":"📊 Ollama 状态",
+    "status.refresh":"🔄 刷新",
+    "status.running":"运行中 (ollama ps)",
+    "status.installed":"已安装 (ollama list)",
+    "import.heading":"⬇️ 从 HuggingFace 导入",
+    "import.repoId.label":"HuggingFace Repo ID",
+    "import.repoId.ph":"如 bartowski/Llama-3.2-3B-Instruct-GGUF",
+    "import.revision.label":"Revision / 分支",
+    "import.listFiles":"📁 列出文件",
+    "import.selectLabel":"选择要下载的文件",
+    "import.selectGguf":"全选 GGUF",
+    "import.selectSafetensors":"全选 Safetensors+配置文件",
+    "import.selectNone":"清除",
+    "import.fmt.label":"格式",
+    "import.fmt.gguf":"GGUF（单文件/分割文件）",
+    "import.fmt.safetensors":"Safetensors（完整 repo 转换）",
+    "import.modelName.label":"Ollama 模型名称",
+    "import.modelName.ph":"如 my-llama3.2:3b",
+    "import.extra.label":"额外 Modelfile 指令（选填，如 TEMPLATE / PARAMETER / SYSTEM）",
+    "import.start":"🚀 开始下载并导入",
+    "jobs.heading":"🛠️ 任务进度",
+    "msg.saved":"已保存",
+    "msg.testing":"测试中...",
+    "msg.ollamaOk":"ollama OK",
+    "msg.ollamaFail":"ollama 无法连接",
+    "msg.dataDirOk":"数据目录可写",
+    "msg.dataDirErr":"数据目录：{0}",
+    "msg.fillRepoId":"请填 repo id",
+    "msg.readingFiles":"读取文件列表...",
+    "msg.filesCount":"{0} 个文件",
+    "msg.selectOne":"请至少选一个文件",
+    "msg.fillModelName":"请填模型名称",
+    "msg.jobStarted":"任务已启动",
+    "status.fetchFail":"无法获取：{0}",
+    "status.none":"（无）",
+    "job.running":"运行中",
+    "job.done":"完成",
+    "job.error":"错误",
+    "job.queued":"排队中"
+  }
+};
+
+function detectLang(){
+  const saved=localStorage.getItem('h2o_lang');
+  if(saved && I18N[saved]) return saved;
+  const n=(navigator.language||'en').toLowerCase();
+  if(n.startsWith('zh')) return (n.includes('cn')||n.includes('hans')||n.includes('sg'))?'zh-Hans':'zh-Hant';
+  if(n.startsWith('ja')) return 'ja';
+  if(n.startsWith('ko')) return 'ko';
+  if(n.startsWith('en')) return 'en';
+  return 'zh-Hant';
+}
+let curLang = detectLang();
+function t(key, ...args){
+  const dict = I18N[curLang] || I18N['en'];
+  let s = (dict[key] !== undefined) ? dict[key]
+        : (I18N['en'][key] !== undefined ? I18N['en'][key] : key);
+  args.forEach((a,i)=>{ s = s.replace('{'+i+'}', a); });
+  return s;
+}
+function applyI18n(){
+  document.documentElement.lang = curLang;
+  document.title = t('doc.title');
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.placeholder = t(el.getAttribute('data-i18n-ph')); });
+  // hf token placeholder depends on whether a token is already stored
+  $('hf_token').placeholder = hfTokenSet ? t('settings.hfToken.phSet') : t('settings.hfToken.ph');
+  renderConnBadge();
+  renderJobs();
+}
+function setLang(l){
+  if(!I18N[l]) return;
+  curLang = l;
+  localStorage.setItem('h2o_lang', l);
+  applyI18n();
+  if(connInfo && connInfo.ok) refreshStatus();  // re-render tables in the new language
+}
+
+// ==================== app ====================
+const $ = id => document.getElementById(id);
+async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail||r.statusText);return r.json();}
+async function jpost(u,b){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||r.statusText);return d;}
+function human(n){n=+n||0;const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return n.toFixed(1)+' '+u[i];}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+let hfTokenSet=false;
+let connInfo=null;     // {ok, mode}
+let lastJobs=[];
+
+function renderConnBadge(){
+  const b=$('connBadge');
+  if(connInfo && connInfo.ok){ b.textContent=t('badge.connectedWith', connInfo.mode); }
+  else { b.textContent=t('badge.disconnected'); }
+}
+
+function updateModeUI(){
+  const m=$('run_mode').value;
+  document.querySelectorAll('.mode-rows>div').forEach(d=>{d.style.display=d.dataset.mode===m?'block':'none';});
+}
+
+async function loadSettings(){
+  const s=await jget('/api/settings');
+  $('ollama_data_dir').value=s.ollama_data_dir||'';
+  $('run_mode').value=s.run_mode||'api';
+  $('ollama_host').value=s.ollama_host||'';
+  $('binary_path').value=s.binary_path||'';
+  $('docker_container').value=s.docker_container||'';
+  $('docker_command').value=s.docker_command||'';
+  $('download_dir').value=s.download_dir||'';
+  hfTokenSet=!!s.hf_token_set;
+  $('hf_token').placeholder = hfTokenSet ? t('settings.hfToken.phSet') : t('settings.hfToken.ph');
+  updateModeUI();
+}
+
+function formBody(){
+  const body={
+    ollama_data_dir:$('ollama_data_dir').value.trim(),
+    run_mode:$('run_mode').value,
+    ollama_host:$('ollama_host').value.trim(),
+    binary_path:$('binary_path').value.trim(),
+    docker_container:$('docker_container').value.trim(),
+    docker_command:$('docker_command').value.trim(),
+    download_dir:$('download_dir').value.trim(),
+  };
+  const tok=$('hf_token').value;if(tok)body.hf_token=tok;
+  return body;
+}
+async function persistForm(){await jpost('/api/settings',formBody());$('hf_token').value='';}
+
+async function saveSettings(){
+  try{await persistForm();$('connStatus').innerHTML='<span class="pill ok">'+t('msg.saved')+'</span>';testConnection();}
+  catch(e){$('connStatus').innerHTML='<span class="pill err">'+esc(e.message)+'</span>';}
+}
+
+async function testConnection(){
+  $('connStatus').innerHTML='<span class="spin"></span> '+t('msg.testing');
+  try{
+    await persistForm();  // test what's currently in the form, not the old saved value
+    const r=await jget('/api/test-connection');
+    let h='';
+    h+=r.ollama_ok?'<span class="pill ok">'+t('msg.ollamaOk')+'</span> '+esc(r.ollama_version)
+                  :'<span class="pill err">'+t('msg.ollamaFail')+'</span> '+esc(r.ollama_error);
+    h+=' &nbsp; ';
+    h+=r.data_dir_ok?'<span class="pill ok">'+t('msg.dataDirOk')+'</span>'
+                    :'<span class="pill err">'+esc(t('msg.dataDirErr', r.data_dir_msg))+'</span>';
+    $('connStatus').innerHTML=h;
+    connInfo={ok:r.ollama_ok, mode:r.run_mode};
+    renderConnBadge();
+    if(r.ollama_ok)refreshStatus();
+  }catch(e){$('connStatus').innerHTML='<span class="pill err">'+esc(e.message)+'</span>';}
+}
+
+function renderTable(el,data){
+  if(!data.ok){el.innerHTML='<div class="empty">'+esc(t('status.fetchFail', data.raw||''))+'</div>';return;}
+  if(!data.rows||!data.rows.length){el.innerHTML='<div class="empty">'+t('status.none')+'</div>';return;}
+  const cols=Object.keys(data.rows[0]);
+  let h='<table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>';
+  h+=data.rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+'</tr>').join('');
+  h+='</tbody></table>';el.innerHTML=h;
+}
+async function refreshStatus(){
+  try{renderTable($('psTable'),await jget('/api/ps'));}catch(e){$('psTable').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}
+  try{renderTable($('listTable'),await jget('/api/installed'));}catch(e){$('listTable').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}
+}
+
+let currentFiles=[];
+async function listFiles(){
+  const repo=$('repo_id').value.trim();
+  if(!repo){$('filesStatus').innerHTML='<span class="pill err">'+t('msg.fillRepoId')+'</span>';return;}
+  $('filesStatus').innerHTML='<span class="spin"></span> '+t('msg.readingFiles');
+  try{
+    const r=await jget('/api/hf/files?repo_id='+encodeURIComponent(repo)+'&revision='+encodeURIComponent($('revision').value.trim()||'main'));
+    currentFiles=r.files;
+    renderFiles();
+    $('filesWrap').style.display='block';
+    $('filesStatus').innerHTML='<span class="pill ok">'+t('msg.filesCount', r.files.length)+'</span>';
+    // auto-suggest format + name
+    const hasGguf=r.files.some(f=>f.is_gguf);
+    $('fmt').value=hasGguf?'gguf':'safetensors';
+    if(!$('model_name').value)$('model_name').value=repo.split('/').pop().toLowerCase().replace(/-gguf$/i,'');
+    selectByType(hasGguf?'gguf':'safetensors');
+  }catch(e){$('filesStatus').innerHTML='<span class="pill err">'+esc(e.message)+'</span>';}
+}
+function renderFiles(){
+  $('fileList').innerHTML=currentFiles.map((f,i)=>{
+    let tag='';if(f.is_gguf)tag='<span class="tag">GGUF</span>';else if(f.is_safetensors)tag='<span class="tag">safetensors</span>';
+    return '<div class="filerow"><input type="checkbox" data-i="'+i+'" id="f'+i+'">'+
+      '<code>'+esc(f.path)+'</code>'+tag+
+      '<span class="sz">'+(f.size?human(f.size):'')+'</span></div>';
+  }).join('');
+}
+function selectByType(ty){
+  currentFiles.forEach((f,i)=>{
+    const cb=$('f'+i);if(!cb)return;
+    if(ty==='none')cb.checked=false;
+    else if(ty==='gguf')cb.checked=f.is_gguf;
+    else if(ty==='safetensors')cb.checked=!f.is_gguf; // everything except gguf (weights + configs)
+  });
+}
+function selectedFiles(){return currentFiles.filter((f,i)=>$('f'+i)&&$('f'+i).checked).map(f=>f.path);}
+
+async function startImport(){
+  const files=selectedFiles();
+  if(!files.length){$('importStatus').innerHTML='<span class="pill err">'+t('msg.selectOne')+'</span>';return;}
+  if(!$('model_name').value.trim()){$('importStatus').innerHTML='<span class="pill err">'+t('msg.fillModelName')+'</span>';return;}
+  try{
+    const r=await jpost('/api/import',{
+      repo_id:$('repo_id').value.trim(),
+      files:files,
+      fmt:$('fmt').value,
+      model_name:$('model_name').value.trim(),
+      revision:$('revision').value.trim()||'main',
+      extra_modelfile:$('extra_modelfile').value,
+    });
+    $('importStatus').innerHTML='<span class="pill ok">'+t('msg.jobStarted')+'</span>';
+    $('jobsCard').style.display='block';
+    pollJobs();
+  }catch(e){$('importStatus').innerHTML='<span class="pill err">'+esc(e.message)+'</span>';}
+}
+
+let jobsTimer=null;
+async function pollJobs(){
+  if(jobsTimer)clearInterval(jobsTimer);
+  const tick=async()=>{
+    try{
+      const r=await jget('/api/jobs');
+      if(!r.jobs.length){return;}
+      lastJobs=r.jobs;
+      $('jobsCard').style.display='block';
+      renderJobs();
+      const active=r.jobs.some(j=>j.status==='running'||j.status==='queued');
+      if(active)refreshStatusThrottled();
+      if(!active&&jobsTimer){clearInterval(jobsTimer);jobsTimer=null;refreshStatus();}
+    }catch(e){}
+  };
+  await tick();
+  jobsTimer=setInterval(tick,1200);
+}
+function renderJobs(){
+  if(!lastJobs.length)return;
+  $('jobsWrap').innerHTML=lastJobs.map(renderJob).join('');
+}
+function renderJob(j){
+  const badge=j.status==='running'?'<span class="spin"></span> '+t('job.running'):
+    j.status==='done'?'<span class="pill ok">'+t('job.done')+'</span>':
+    j.status==='error'?'<span class="pill err">'+t('job.error')+'</span>':'<span class="pill">'+t('job.queued')+'</span>';
+  let h='<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">';
+  h+='<div class="row"><strong>'+esc(j.title)+'</strong>'+badge+'</div>';
+  h+='<div class="statusline muted">'+esc(j.stage||'')+(j.progress_label?' · '+esc(j.progress_label):'')+'</div>';
+  if(j.status==='running'){h+='<div class="progress"><div style="width:'+(j.progress||0)+'%"></div></div>';}
+  if(j.error)h+='<div class="statusline"><span class="pill err">'+esc(j.error)+'</span></div>';
+  h+='<pre class="log">'+esc(j.log||'')+'</pre>';
+  h+='</div>';return h;
+}
+
+let lastStatus=0;
+function refreshStatusThrottled(){const t=Date.now();if(t-lastStatus>4000){lastStatus=t;refreshStatus();}}
+
+// ==================== init ====================
+$('lang').value=curLang;
+applyI18n();
+loadSettings().then(testConnection);
+jget('/api/jobs').then(r=>{if(r.jobs&&r.jobs.length){lastJobs=r.jobs;$('jobsCard').style.display='block';pollJobs();}});
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+huggingface_hub
+requests
+jinja2
+python-multipart
