@@ -32,6 +32,7 @@ The human set the goals, made the product decisions, tested against a real Ollam
   - **Docker (`docker exec`)** — Runs `docker exec` against the container; set the command to `sudo docker` when the socket needs privileges.
 - **📊 Status view** — Shows `ollama ps` (running) and `ollama list` (installed), refreshable.
 - **⬇️ Import flow** — Lists files in a HF repo, lets you pick which to download, streams live progress, then creates the Ollama model automatically. Both GGUF and Safetensors are supported.
+- **🧹 Staging cleanup** — Downloaded files are staged on disk before import. Optionally **auto-delete the staging after a successful import**, or wipe **all** staged downloads from the UI in one click (already-imported models are unaffected — Ollama keeps its own copy).
 
 ---
 

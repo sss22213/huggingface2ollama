@@ -36,6 +36,8 @@ class Settings:
     hf_token: str = ""
     # Host directory where HuggingFace files are downloaded.
     download_dir: str = DEFAULT_DOWNLOAD_DIR
+    # Delete a job's staging files automatically after a successful import.
+    auto_cleanup: bool = False
 
     def public(self) -> dict:
         """Return a dict safe to send to the browser (token masked)."""

@@ -6,6 +6,7 @@ UI polls via /api/jobs/{id}.
 from __future__ import annotations
 
 import os
+import shutil
 import threading
 import time
 import uuid
@@ -141,8 +142,20 @@ def _run_import(job, repo_id, files, fmt, model_name, revision, extra_modelfile)
 
         job.stage = "Completed"
         job.progress = 100.0
-        job.status = "done"
         _log(job, f"\n✔ Model '{model_name}' created successfully.")
+
+        # Optional: remove the host-side staging files now that ollama has its
+        # own copy of the model (saves disk; opt-in via settings.auto_cleanup).
+        if s.auto_cleanup:
+            job.stage = "Cleaning up staging"
+            try:
+                shutil.rmtree(stage_dir)
+                _log(job, f"🧹 Removed staging directory: {stage_dir}")
+            except Exception as e:
+                _log(job, f"[warn] could not remove staging dir {stage_dir}: {e}")
+            job.stage = "Completed"
+
+        job.status = "done"
     except Exception as e:
         job.status = "error"
         job.error = str(e)
@@ -192,3 +205,89 @@ def _build_modelfile(fmt, files, local_paths, stage_dir, extra, s) -> str:
         lines.append("")
         lines.append(extra.strip())
     return "\n".join(lines) + "\n"
+
+
+# ---------------- Staging management ----------------
+def _human(n: int) -> str:
+    f = float(n)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if f < 1024 or unit == "TB":
+            return f"{int(f)} {unit}" if unit == "B" else f"{f:.1f} {unit}"
+        f /= 1024
+    return f"{n} B"
+
+
+def _dir_size(path: str) -> int:
+    if not os.path.isdir(path):
+        try:
+            return os.path.getsize(path)
+        except OSError:
+            return 0
+    total = 0
+    for root, _dirs, names in os.walk(path):
+        for name in names:
+            try:
+                total += os.path.getsize(os.path.join(root, name))
+            except OSError:
+                pass
+    return total
+
+
+def list_staging() -> dict:
+    """List the entries under the download/staging directory with their sizes."""
+    s = settings_mod.load()
+    base = s.download_dir
+    entries: list[dict] = []
+    total = 0
+    if os.path.isdir(base):
+        for name in sorted(os.listdir(base)):
+            size = _dir_size(os.path.join(base, name))
+            total += size
+            entries.append({"name": name, "size": size, "size_human": _human(size)})
+    return {
+        "dir": base,
+        "entries": entries,
+        "count": len(entries),
+        "total": total,
+        "total_human": _human(total),
+    }
+
+
+def clear_staging() -> dict:
+    """Delete every entry inside the download/staging directory.
+
+    Already-imported models are unaffected because ollama keeps its own copy.
+    Entries that cannot be deleted (e.g. root-owned files) are reported in
+    `failed` rather than aborting the whole operation.
+    """
+    s = settings_mod.load()
+    base = os.path.abspath(s.download_dir)
+    # Safety: never operate on an obviously dangerous root.
+    if not base or base in ("/", os.path.expanduser("~")):
+        return {"ok": False, "error": f"refusing to clear unsafe path: {base}",
+                "deleted": [], "failed": [], "freed": 0, "freed_human": _human(0)}
+    if not os.path.isdir(base):
+        return {"ok": True, "deleted": [], "failed": [], "freed": 0, "freed_human": _human(0)}
+
+    deleted: list[str] = []
+    failed: list[dict] = []
+    freed = 0
+    for name in sorted(os.listdir(base)):
+        p = os.path.join(base, name)
+        size = _dir_size(p)
+        try:
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.rmtree(p)
+            else:
+                os.remove(p)
+            deleted.append(name)
+            freed += size
+        except Exception as e:
+            failed.append({"name": name, "error": str(e)})
+    return {
+        "ok": len(failed) == 0,
+        "deleted": deleted,
+        "failed": failed,
+        "freed": freed,
+        "freed_human": _human(freed),
+    }

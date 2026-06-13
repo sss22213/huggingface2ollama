@@ -128,11 +128,32 @@
         <input type="text" id="download_dir">
       </div>
     </div>
+    <div style="margin-top:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text)">
+        <input type="checkbox" id="auto_cleanup" style="width:auto;margin:0">
+        <span data-i18n="settings.autoCleanup.label">Auto-delete staging after import</span>
+      </label>
+      <div class="hint" data-i18n="settings.autoCleanup.hint"></div>
+    </div>
     <div class="row" style="margin-top:14px">
       <button onclick="saveSettings()" data-i18n="settings.save">Save</button>
       <button class="secondary" onclick="testConnection()" data-i18n="settings.test">Test</button>
       <span id="connStatus" class="statusline"></span>
     </div>
+  </div>
+
+  <!-- ============ Download staging ============ -->
+  <div class="card">
+    <h2>
+      <span data-i18n="staging.heading">🧹 Download staging</span>
+      <button class="secondary" style="margin-left:auto;font-size:12px;padding:4px 10px" onclick="refreshStaging()" data-i18n="staging.refresh">Refresh</button>
+    </h2>
+    <div class="row" style="margin-bottom:10px">
+      <span id="stagingTotal" class="statusline muted">—</span>
+      <button class="secondary" style="margin-left:auto" onclick="clearStaging()" id="clearStagingBtn" data-i18n="staging.clear">Delete all staging</button>
+    </div>
+    <div id="stagingTable"></div>
+    <div id="stagingStatus" class="statusline"></div>
   </div>
 
   <!-- ============ Ollama status ============ -->
@@ -234,6 +255,20 @@ const I18N = {
     "settings.hfToken.ph":"hf_xxx（已設定則留空維持原值）",
     "settings.hfToken.phSet":"已設定（留空維持原值）",
     "settings.downloadDir.label":"下載暫存目錄",
+    "settings.autoCleanup.label":"匯入成功後自動刪除暫存",
+    "settings.autoCleanup.hint":"模型成功匯入後，刪除其下載檔以節省磁碟空間（Ollama 已保有自己的副本）。",
+    "staging.heading":"🧹 下載暫存",
+    "staging.refresh":"🔄 重新整理",
+    "staging.clear":"🗑️ 刪除所有暫存",
+    "staging.confirm":"確定要刪除 {0} 內所有暫存下載？已匯入的模型不受影響（Ollama 保有自己的副本），此操作無法復原。",
+    "staging.total":"{0}，共 {1} 個項目",
+    "staging.empty":"暫存區是空的",
+    "staging.clearing":"刪除中...",
+    "staging.cleared":"已釋放 {0}",
+    "staging.partial":"已釋放 {0} · {1} 個無法刪除（root 擁有，請改用 sudo）",
+    "staging.loadFail":"無法讀取暫存：{0}",
+    "staging.col.name":"資料夾",
+    "staging.col.size":"大小",
     "settings.save":"💾 儲存設定",
     "settings.test":"🔌 測試連線",
     "status.heading":"📊 Ollama 狀態",
@@ -301,6 +336,20 @@ const I18N = {
     "settings.hfToken.ph":"hf_xxx (leave blank to keep current)",
     "settings.hfToken.phSet":"Already set (leave blank to keep)",
     "settings.downloadDir.label":"Download staging directory",
+    "settings.autoCleanup.label":"Auto-delete staging after a successful import",
+    "settings.autoCleanup.hint":"Once a model imports successfully, remove its downloaded files to save disk space (Ollama already keeps its own copy).",
+    "staging.heading":"🧹 Download staging",
+    "staging.refresh":"🔄 Refresh",
+    "staging.clear":"🗑️ Delete all staging",
+    "staging.confirm":"Delete ALL staged downloads in {0}? Already-imported models are unaffected (Ollama keeps its own copy). This cannot be undone.",
+    "staging.total":"{0} across {1} items",
+    "staging.empty":"Staging is empty",
+    "staging.clearing":"Deleting...",
+    "staging.cleared":"Freed {0}",
+    "staging.partial":"Freed {0} · {1} could not be deleted (root-owned — try sudo)",
+    "staging.loadFail":"Could not read staging: {0}",
+    "staging.col.name":"Folder",
+    "staging.col.size":"Size",
     "settings.save":"💾 Save settings",
     "settings.test":"🔌 Test connection",
     "status.heading":"📊 Ollama status",
@@ -368,6 +417,20 @@ const I18N = {
     "settings.hfToken.ph":"hf_xxx（設定済みなら空欄で現状維持）",
     "settings.hfToken.phSet":"設定済み（空欄で現状維持）",
     "settings.downloadDir.label":"ダウンロード一時ディレクトリ",
+    "settings.autoCleanup.label":"インポート成功後に一時ファイルを自動削除",
+    "settings.autoCleanup.hint":"モデルのインポートが成功したら、ダウンロードしたファイルを削除してディスク容量を節約します（Ollama が独自のコピーを保持済み）。",
+    "staging.heading":"🧹 ダウンロード一時領域",
+    "staging.refresh":"🔄 更新",
+    "staging.clear":"🗑️ すべての一時ファイルを削除",
+    "staging.confirm":"{0} 内のすべての一時ダウンロードを削除しますか？インポート済みのモデルには影響しません（Ollama が独自のコピーを保持）。この操作は元に戻せません。",
+    "staging.total":"{0}・{1} 件",
+    "staging.empty":"一時領域は空です",
+    "staging.clearing":"削除中...",
+    "staging.cleared":"{0} を解放しました",
+    "staging.partial":"{0} を解放 · {1} 件は削除できません（root 所有、sudo が必要）",
+    "staging.loadFail":"一時領域を読み取れません：{0}",
+    "staging.col.name":"フォルダ",
+    "staging.col.size":"サイズ",
     "settings.save":"💾 設定を保存",
     "settings.test":"🔌 接続テスト",
     "status.heading":"📊 Ollama ステータス",
@@ -435,6 +498,20 @@ const I18N = {
     "settings.hfToken.ph":"hf_xxx (설정되어 있으면 비워두면 유지)",
     "settings.hfToken.phSet":"설정됨 (비워두면 유지)",
     "settings.downloadDir.label":"다운로드 임시 디렉터리",
+    "settings.autoCleanup.label":"가져오기 성공 후 임시 파일 자동 삭제",
+    "settings.autoCleanup.hint":"모델 가져오기가 성공하면 다운로드한 파일을 삭제하여 디스크 공간을 절약합니다(Ollama가 자체 사본 보유).",
+    "staging.heading":"🧹 다운로드 임시 영역",
+    "staging.refresh":"🔄 새로고침",
+    "staging.clear":"🗑️ 모든 임시 파일 삭제",
+    "staging.confirm":"{0} 안의 모든 임시 다운로드를 삭제할까요? 이미 가져온 모델은 영향받지 않습니다(Ollama가 자체 사본 보유). 이 작업은 되돌릴 수 없습니다.",
+    "staging.total":"{0} · {1}개",
+    "staging.empty":"임시 영역이 비어 있습니다",
+    "staging.clearing":"삭제 중...",
+    "staging.cleared":"{0} 확보됨",
+    "staging.partial":"{0} 확보 · {1}개 삭제 불가(root 소유, sudo 필요)",
+    "staging.loadFail":"임시 영역을 읽을 수 없음: {0}",
+    "staging.col.name":"폴더",
+    "staging.col.size":"크기",
     "settings.save":"💾 설정 저장",
     "settings.test":"🔌 연결 테스트",
     "status.heading":"📊 Ollama 상태",
@@ -502,6 +579,20 @@ const I18N = {
     "settings.hfToken.ph":"hf_xxx（已设置则留空保持原值）",
     "settings.hfToken.phSet":"已设置（留空保持原值）",
     "settings.downloadDir.label":"下载暂存目录",
+    "settings.autoCleanup.label":"导入成功后自动删除暂存",
+    "settings.autoCleanup.hint":"模型成功导入后，删除其下载文件以节省磁盘空间（Ollama 已保有自己的副本）。",
+    "staging.heading":"🧹 下载暂存",
+    "staging.refresh":"🔄 刷新",
+    "staging.clear":"🗑️ 删除所有暂存",
+    "staging.confirm":"确定要删除 {0} 内所有暂存下载？已导入的模型不受影响（Ollama 保有自己的副本），此操作无法撤销。",
+    "staging.total":"{0}，共 {1} 个项目",
+    "staging.empty":"暂存区是空的",
+    "staging.clearing":"删除中...",
+    "staging.cleared":"已释放 {0}",
+    "staging.partial":"已释放 {0} · {1} 个无法删除（root 拥有，请改用 sudo）",
+    "staging.loadFail":"无法读取暂存：{0}",
+    "staging.col.name":"文件夹",
+    "staging.col.size":"大小",
     "settings.save":"💾 保存设置",
     "settings.test":"🔌 测试连接",
     "status.heading":"📊 Ollama 状态",
@@ -613,6 +704,7 @@ async function loadSettings(){
   $('docker_container').value=s.docker_container||'';
   $('docker_command').value=s.docker_command||'';
   $('download_dir').value=s.download_dir||'';
+  $('auto_cleanup').checked=!!s.auto_cleanup;
   hfTokenSet=!!s.hf_token_set;
   $('hf_token').placeholder = hfTokenSet ? t('settings.hfToken.phSet') : t('settings.hfToken.ph');
   updateModeUI();
@@ -627,6 +719,7 @@ function formBody(){
     docker_container:$('docker_container').value.trim(),
     docker_command:$('docker_command').value.trim(),
     download_dir:$('download_dir').value.trim(),
+    auto_cleanup:$('auto_cleanup').checked,
   };
   const tok=$('hf_token').value;if(tok)body.hf_token=tok;
   return body;
@@ -667,6 +760,44 @@ function renderTable(el,data){
 async function refreshStatus(){
   try{renderTable($('psTable'),await jget('/api/ps'));}catch(e){$('psTable').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}
   try{renderTable($('listTable'),await jget('/api/installed'));}catch(e){$('listTable').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}
+}
+
+// ---------------- Download staging ----------------
+async function refreshStaging(){
+  try{
+    const r=await jget('/api/downloads');
+    $('stagingTotal').textContent=r.count
+      ? t('staging.total', r.total_human, r.count)
+      : t('staging.empty');
+    if(!r.entries.length){ $('stagingTable').innerHTML=''; return; }
+    let h='<table><thead><tr><th>'+t('staging.col.name')+'</th><th style="text-align:right">'+t('staging.col.size')+'</th></tr></thead><tbody>';
+    h+=r.entries.map(e=>'<tr><td><code style="font-family:ui-monospace,monospace;font-size:12px">'+esc(e.name)+'</code></td><td style="text-align:right">'+esc(e.size_human)+'</td></tr>').join('');
+    h+='</tbody></table>';
+    $('stagingTable').innerHTML=h;
+  }catch(e){
+    $('stagingTable').innerHTML='';
+    $('stagingTotal').textContent=t('staging.loadFail', e.message);
+  }
+}
+async function clearStaging(){
+  let dir='';
+  try{ dir=(await jget('/api/downloads')).dir||''; }catch(e){}
+  if(!confirm(t('staging.confirm', dir))) return;
+  $('stagingStatus').innerHTML='<span class="spin"></span> '+t('staging.clearing');
+  $('clearStagingBtn').disabled=true;
+  try{
+    const r=await jpost('/api/downloads/clear',{});
+    if(r.failed && r.failed.length){
+      $('stagingStatus').innerHTML='<span class="pill err">'+esc(t('staging.partial', r.freed_human, r.failed.length))+'</span>';
+    }else{
+      $('stagingStatus').innerHTML='<span class="pill ok">'+esc(t('staging.cleared', r.freed_human))+'</span>';
+    }
+  }catch(e){
+    $('stagingStatus').innerHTML='<span class="pill err">'+esc(e.message)+'</span>';
+  }finally{
+    $('clearStagingBtn').disabled=false;
+    refreshStaging();
+  }
 }
 
 let currentFiles=[];
@@ -736,7 +867,7 @@ async function pollJobs(){
       renderJobs();
       const active=r.jobs.some(j=>j.status==='running'||j.status==='queued');
       if(active)refreshStatusThrottled();
-      if(!active&&jobsTimer){clearInterval(jobsTimer);jobsTimer=null;refreshStatus();}
+      if(!active&&jobsTimer){clearInterval(jobsTimer);jobsTimer=null;refreshStatus();refreshStaging();}
     }catch(e){}
   };
   await tick();
@@ -766,6 +897,7 @@ function refreshStatusThrottled(){const t=Date.now();if(t-lastStatus>4000){lastS
 $('lang').value=curLang;
 applyI18n();
 loadSettings().then(testConnection);
+refreshStaging();
 jget('/api/jobs').then(r=>{if(r.jobs&&r.jobs.length){lastJobs=r.jobs;$('jobsCard').style.display='block';pollJobs();}});
 </script>
 </body>

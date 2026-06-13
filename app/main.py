@@ -31,6 +31,7 @@ class SettingsPatch(BaseModel):
     docker_command: str | None = None
     hf_token: str | None = None
     download_dir: str | None = None
+    auto_cleanup: bool | None = None
 
 
 @app.get("/api/settings")
@@ -123,6 +124,19 @@ def api_import(req: ImportReq):
         req.repo_id, req.files, req.fmt, req.model_name, req.revision, req.extra_modelfile
     )
     return {"job_id": job.id}
+
+
+# ---------------- Download staging ----------------
+@app.get("/api/downloads")
+def api_downloads():
+    """List the staged download folders and their sizes."""
+    return jobs.list_staging()
+
+
+@app.post("/api/downloads/clear")
+def api_downloads_clear():
+    """Delete every staged download. Already-imported models are unaffected."""
+    return jobs.clear_staging()
 
 
 @app.get("/api/jobs")
